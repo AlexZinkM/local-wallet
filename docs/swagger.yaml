@@ -1,0 +1,212 @@
+basePath: /
+definitions:
+  cwt_internal_model.GenerateResponse:
+    properties:
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  cwt_internal_model.LogResponse:
+    properties:
+      address:
+        type: string
+      total_income_USDC:
+        description: USDC only
+        type: string
+      total_spent_USDC:
+        description: USDC only
+        type: string
+      transactions:
+        items:
+          $ref: '#/definitions/cwt_internal_model.Transaction'
+        type: array
+    type: object
+  cwt_internal_model.PayRequest:
+    properties:
+      amount:
+        type: string
+      toAddress:
+        type: string
+    required:
+    - amount
+    - toAddress
+    type: object
+  cwt_internal_model.PayResponse:
+    properties:
+      txId:
+        type: string
+    type: object
+  cwt_internal_model.SolanaBalanceResponse:
+    properties:
+      address:
+        type: string
+      rate:
+        type: string
+      sol:
+        type: string
+      usdc:
+        type: string
+      usdc_amount_in_rub:
+        type: string
+    type: object
+  cwt_internal_model.Transaction:
+    properties:
+      amount:
+        type: string
+      blockNumber:
+        type: integer
+      currency:
+        description: '"USDC" or "SOL"'
+        type: string
+      from:
+        type: string
+      ourFeeSOL:
+        description: SOL we paid as fee
+        type: string
+      status:
+        type: string
+      timestamp:
+        type: string
+      to:
+        type: string
+      txId:
+        type: string
+      type:
+        $ref: '#/definitions/cwt_internal_model.TransactionType'
+    type: object
+  cwt_internal_model.TransactionType:
+    enum:
+    - DEBIT
+    - CREDIT
+    type: string
+    x-enum-varnames:
+    - TransactionTypeDebit
+    - TransactionTypeCredit
+host: 127.0.0.1:8080
+info:
+  contact: {}
+  description: Local Go service for generating crypto wallets, viewing balance and
+    sending stablecoins
+  termsOfService: http://swagger.io/terms/
+  title: Local Crypto Wallet Service API
+  version: "1.0"
+paths:
+  /solana/balance:
+    get:
+      description: Gets USDC and SOL wallet balance with USDC/RUB rate
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cwt_internal_model.SolanaBalanceResponse'
+      summary: Get wallet balance (RUB = USDC * rate)
+      tags:
+      - solana
+  /solana/generate:
+    post:
+      consumes:
+      - application/json
+      description: Generates a new Solana wallet and saves it to .cwt or .txt file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cwt_internal_model.GenerateResponse'
+      summary: Generate new wallet
+      tags:
+      - solana
+  /solana/pay/sol:
+    post:
+      consumes:
+      - application/json
+      description: Sends a SOL transaction to the specified address
+      parameters:
+      - description: Payment data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/cwt_internal_model.PayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cwt_internal_model.PayResponse'
+      summary: Send SOL
+      tags:
+      - solana
+  /solana/pay/usdc:
+    post:
+      consumes:
+      - application/json
+      description: Sends a USDC transaction to the specified address
+      parameters:
+      - description: Payment data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/cwt_internal_model.PayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cwt_internal_model.PayResponse'
+      summary: Send USDC
+      tags:
+      - solana
+  /solana/transactions:
+    get:
+      description: Gets list of wallet transactions with filtering capability (USDC
+        and SOL)
+      parameters:
+      - description: 'Transaction type: DEBIT or CREDIT'
+        in: query
+        name: type
+        type: string
+      - description: Transaction ID
+        in: query
+        name: txId
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      - description: Minimum amount
+        in: query
+        name: minAmount
+        type: string
+      - description: Maximum amount
+        in: query
+        name: maxAmount
+        type: string
+      - description: 'Filter by currency: USDC or SOL'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cwt_internal_model.LogResponse'
+      summary: Get wallet transactions
+      tags:
+      - solana
+schemes:
+- http
+swagger: "2.0"

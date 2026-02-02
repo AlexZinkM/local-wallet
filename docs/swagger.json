@@ -1,0 +1,318 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Local Go service for generating crypto wallets, viewing balance and sending stablecoins",
+        "title": "Local Crypto Wallet Service API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "127.0.0.1:8080",
+    "basePath": "/",
+    "paths": {
+        "/solana/balance": {
+            "get": {
+                "description": "Gets USDC and SOL wallet balance with USDC/RUB rate",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "solana"
+                ],
+                "summary": "Get wallet balance (RUB = USDC * rate)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.SolanaBalanceResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/solana/generate": {
+            "post": {
+                "description": "Generates a new Solana wallet and saves it to .cwt or .txt file",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "solana"
+                ],
+                "summary": "Generate new wallet",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.GenerateResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/solana/pay/sol": {
+            "post": {
+                "description": "Sends a SOL transaction to the specified address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "solana"
+                ],
+                "summary": "Send SOL",
+                "parameters": [
+                    {
+                        "description": "Payment data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.PayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.PayResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/solana/pay/usdc": {
+            "post": {
+                "description": "Sends a USDC transaction to the specified address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "solana"
+                ],
+                "summary": "Send USDC",
+                "parameters": [
+                    {
+                        "description": "Payment data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.PayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.PayResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/solana/transactions": {
+            "get": {
+                "description": "Gets list of wallet transactions with filtering capability (USDC and SOL)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "solana"
+                ],
+                "summary": "Get wallet transactions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction type: DEBIT or CREDIT",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Transaction ID",
+                        "name": "txId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Minimum amount",
+                        "name": "minAmount",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Maximum amount",
+                        "name": "maxAmount",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by currency: USDC or SOL",
+                        "name": "currency",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cwt_internal_model.LogResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "cwt_internal_model.GenerateResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "cwt_internal_model.LogResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "total_income_USDC": {
+                    "description": "USDC only",
+                    "type": "string"
+                },
+                "total_spent_USDC": {
+                    "description": "USDC only",
+                    "type": "string"
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cwt_internal_model.Transaction"
+                    }
+                }
+            }
+        },
+        "cwt_internal_model.PayRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "toAddress"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "toAddress": {
+                    "type": "string"
+                }
+            }
+        },
+        "cwt_internal_model.PayResponse": {
+            "type": "object",
+            "properties": {
+                "txId": {
+                    "type": "string"
+                }
+            }
+        },
+        "cwt_internal_model.SolanaBalanceResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "rate": {
+                    "type": "string"
+                },
+                "sol": {
+                    "type": "string"
+                },
+                "usdc": {
+                    "type": "string"
+                },
+                "usdc_amount_in_rub": {
+                    "type": "string"
+                }
+            }
+        },
+        "cwt_internal_model.Transaction": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "blockNumber": {
+                    "type": "integer"
+                },
+                "currency": {
+                    "description": "\"USDC\" or \"SOL\"",
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "ourFeeSOL": {
+                    "description": "SOL we paid as fee",
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "to": {
+                    "type": "string"
+                },
+                "txId": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/cwt_internal_model.TransactionType"
+                }
+            }
+        },
+        "cwt_internal_model.TransactionType": {
+            "type": "string",
+            "enum": [
+                "DEBIT",
+                "CREDIT"
+            ],
+            "x-enum-varnames": [
+                "TransactionTypeDebit",
+                "TransactionTypeCredit"
+            ]
+        }
+    }
+}
