@@ -1,4 +1,4 @@
-module cwt
+module github.com/AlexZinkM/local-wallet
 
 go 1.25.4
 

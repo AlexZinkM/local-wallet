@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"cwt/internal/common"
+	"github.com/AlexZinkM/local-wallet/internal/common"
 )
 
 // TransactionType transaction type

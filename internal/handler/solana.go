@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"cwt/internal/config"
-	"cwt/internal/model"
-	"cwt/solana"
+	"github.com/AlexZinkM/local-wallet/internal/config"
+	"github.com/AlexZinkM/local-wallet/internal/model"
+	"github.com/AlexZinkM/local-wallet/solana"
 )
 
 // SolanaHandler holds configuration for Solana operations

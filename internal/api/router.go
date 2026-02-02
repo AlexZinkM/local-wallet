@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"cwt/internal/handler"
+	"github.com/AlexZinkM/local-wallet/internal/handler"
 
 	httpSwagger "github.com/swaggo/http-swagger"
 )

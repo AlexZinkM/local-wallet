@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"cwt/internal/common"
-	"cwt/internal/config"
+	"github.com/AlexZinkM/local-wallet/internal/common"
+	"github.com/AlexZinkM/local-wallet/internal/config"
 
 	"github.com/gagliardetto/solana-go"
 	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"

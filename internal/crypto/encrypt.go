@@ -12,7 +12,7 @@ import (
 	"os"
 	"strings"
 
-	"cwt/internal/model"
+	"github.com/AlexZinkM/local-wallet/internal/model"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -121,4 +121,3 @@ func EncryptWallet(filePath string, network, address, qrCode string, walletData 
 
 	return nil
 }
-

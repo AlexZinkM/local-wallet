@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"cwt/internal/client"
-	"cwt/internal/common"
-	"cwt/internal/crypto"
-	"cwt/internal/model"
+	"github.com/AlexZinkM/local-wallet/internal/client"
+	"github.com/AlexZinkM/local-wallet/internal/common"
+	"github.com/AlexZinkM/local-wallet/internal/crypto"
+	"github.com/AlexZinkM/local-wallet/internal/model"
 )
 
 // GetBalance gets wallet balance

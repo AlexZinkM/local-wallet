@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os"
 
-	"cwt/internal/model"
+	"github.com/AlexZinkM/local-wallet/internal/model"
 
 	"golang.org/x/crypto/scrypt"
 )

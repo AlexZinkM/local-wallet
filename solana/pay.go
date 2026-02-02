@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"cwt/internal/client"
-	"cwt/internal/common"
-	"cwt/internal/crypto"
-	"cwt/internal/model"
+	"github.com/AlexZinkM/local-wallet/internal/client"
+	"github.com/AlexZinkM/local-wallet/internal/common"
+	"github.com/AlexZinkM/local-wallet/internal/crypto"
+	"github.com/AlexZinkM/local-wallet/internal/model"
 
 	"github.com/gagliardetto/solana-go"
 )
@@ -54,7 +54,7 @@ func PayUSDC(filePath string, password []byte, toAddress, amount string, cooldow
 		return nil, fmt.Errorf("failed to decrypt wallet: %w", err)
 	}
 
-      // Always clear private key from memory
+	// Always clear private key from memory
 	defer clear(walletData.PrivateKey)
 
 	// Verify private key length (we store full 64-byte key)
@@ -67,7 +67,6 @@ func PayUSDC(filePath string, password []byte, toAddress, amount string, cooldow
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
 	}
-
 
 	wallet := solana.PrivateKey(walletData.PrivateKey)
 
@@ -151,7 +150,7 @@ func PaySOL(filePath string, password []byte, toAddress, amount string, cooldown
 		return nil, fmt.Errorf("failed to decrypt wallet: %w", err)
 	}
 
-   // Always clear private key from memory
+	// Always clear private key from memory
 	defer clear(walletData.PrivateKey)
 
 	// Verify private key length (we store full 64-byte key)

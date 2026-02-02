@@ -76,7 +76,7 @@ Details, request bodies, query params, and response shapes are in **Swagger**. S
 
 ## Library (package `solana`)
 
-Import `cwt/solana` and call these functions. You provide `filePath` (and `password` where needed); the library reads/decrypts the .cwt file and uses `SOLANA_RPC_URL` from the environment when talking to Solana (or default RPC).
+Import `github.com/AlexZinkM/local-wallet/solana` and call these functions. You provide `filePath` (and `password` where needed); the library reads/decrypts the .cwt file and uses `SOLANA_RPC_URL` from the environment when talking to Solana (or default RPC).
 
 ### Generate
 
@@ -95,7 +95,7 @@ Import `cwt/solana` and call these functions. You provide `filePath` (and `passw
 ### History
 
 - **`GetTransactions(filePath string, req *model.LogRequest) (*model.LogResponse, error)`**  
-  Reads address from .cwt, fetches transaction history with optional filters (type, txId, from, to, minAmount, maxAmount, currency). Request/response types are in `cwt/internal/model` (`LogRequest`, `LogResponse`, `Transaction`).
+  Reads address from .cwt, fetches transaction history with optional filters (type, txId, from, to, minAmount, maxAmount, currency). Request/response types are in `github.com/AlexZinkM/local-wallet/internal/model` (`LogRequest`, `LogResponse`, `Transaction`).
 
 ### Pay
 

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"cwt/internal/crypto"
-	"cwt/internal/model"
+	"github.com/AlexZinkM/local-wallet/internal/crypto"
+	"github.com/AlexZinkM/local-wallet/internal/model"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/skip2/go-qrcode"
