@@ -1,13 +1,15 @@
 basePath: /
 definitions:
-  cwt_internal_model.GenerateResponse:
+  github_com_AlexZinkM_local-wallet_internal_model.GenerateResponse:
     properties:
+      address:
+        type: string
       message:
         type: string
       success:
         type: boolean
     type: object
-  cwt_internal_model.LogResponse:
+  github_com_AlexZinkM_local-wallet_internal_model.LogResponse:
     properties:
       address:
         type: string
@@ -19,10 +21,10 @@ definitions:
         type: string
       transactions:
         items:
-          $ref: '#/definitions/cwt_internal_model.Transaction'
+          $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.Transaction'
         type: array
     type: object
-  cwt_internal_model.PayRequest:
+  github_com_AlexZinkM_local-wallet_internal_model.PayRequest:
     properties:
       amount:
         type: string
@@ -32,12 +34,12 @@ definitions:
     - amount
     - toAddress
     type: object
-  cwt_internal_model.PayResponse:
+  github_com_AlexZinkM_local-wallet_internal_model.PayResponse:
     properties:
       txId:
         type: string
     type: object
-  cwt_internal_model.SolanaBalanceResponse:
+  github_com_AlexZinkM_local-wallet_internal_model.SolanaBalanceResponse:
     properties:
       address:
         type: string
@@ -50,7 +52,7 @@ definitions:
       usdc_amount_in_rub:
         type: string
     type: object
-  cwt_internal_model.Transaction:
+  github_com_AlexZinkM_local-wallet_internal_model.Transaction:
     properties:
       amount:
         type: string
@@ -73,9 +75,9 @@ definitions:
       txId:
         type: string
       type:
-        $ref: '#/definitions/cwt_internal_model.TransactionType'
+        $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.TransactionType'
     type: object
-  cwt_internal_model.TransactionType:
+  github_com_AlexZinkM_local-wallet_internal_model.TransactionType:
     enum:
     - DEBIT
     - CREDIT
@@ -101,7 +103,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/cwt_internal_model.SolanaBalanceResponse'
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.SolanaBalanceResponse'
       summary: Get wallet balance (RUB = USDC * rate)
       tags:
       - solana
@@ -116,7 +118,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/cwt_internal_model.GenerateResponse'
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.GenerateResponse'
       summary: Generate new wallet
       tags:
       - solana
@@ -131,14 +133,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/cwt_internal_model.PayRequest'
+          $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/cwt_internal_model.PayResponse'
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse'
       summary: Send SOL
       tags:
       - solana
@@ -153,14 +155,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/cwt_internal_model.PayRequest'
+          $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/cwt_internal_model.PayResponse'
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse'
       summary: Send USDC
       tags:
       - solana
@@ -203,7 +205,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/cwt_internal_model.LogResponse'
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.LogResponse'
       summary: Get wallet transactions
       tags:
       - solana

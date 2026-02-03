@@ -40,16 +40,14 @@ func NewSolanaHandler() (*SolanaHandler, error) {
 // @Router       /solana/generate [post]
 func (h *SolanaHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed. should be POST", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed: use POST", "METHOD_NOT_ALLOWED")
 		return
 	}
 
 	// Get password as []byte, use it, then zero it immediately
 	passwordBytes, err := config.GetSolanaPasswordBytes()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error(), "PASSWORD_REQUIRED")
 		return
 	}
 	defer clear(passwordBytes) // Always clear password from memory
@@ -57,14 +55,10 @@ func (h *SolanaHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	address, err := solana.GenerateWallet(h.filePath, passwordBytes)
 	if err != nil {
 		if solana.IsFileExistsError(err) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusConflict)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeError(w, http.StatusConflict, err.Error(), "FILE_EXISTS")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusInternalServerError, err.Error(), "WALLET_GENERATION_FAILED")
 		return
 	}
 
@@ -86,15 +80,13 @@ func (h *SolanaHandler) Generate(w http.ResponseWriter, r *http.Request) {
 // @Router       /solana/balance [get]
 func (h *SolanaHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed. Should be GET", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed: use GET", "METHOD_NOT_ALLOWED")
 		return
 	}
 
 	balance, err := solana.GetBalance(h.filePath)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusInternalServerError, err.Error(), "BALANCE_FETCH_FAILED")
 		return
 	}
 
@@ -114,33 +106,27 @@ func (h *SolanaHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 // @Router       /solana/pay/usdc [post]
 func (h *SolanaHandler) PayUSDC(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed. Should be POST", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed: use POST", "METHOD_NOT_ALLOWED")
 		return
 	}
 
 	var req model.PayRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error(), "INVALID_REQUEST")
 		return
 	}
 
 	// Get password as []byte, use it, then zero it immediately
 	passwordBytes, err := config.GetSolanaPasswordBytes()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error(), "PASSWORD_REQUIRED")
 		return
 	}
 	defer clear(passwordBytes) // Always clear password from memory
 
 	payResp, err := solana.PayUSDC(h.filePath, passwordBytes, req.ToAddress, req.Amount, h.cooldownMinutes)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusInternalServerError, err.Error(), "PAYMENT_FAILED")
 		return
 	}
 
@@ -160,33 +146,27 @@ func (h *SolanaHandler) PayUSDC(w http.ResponseWriter, r *http.Request) {
 // @Router       /solana/pay/sol [post]
 func (h *SolanaHandler) PaySOL(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed: use POST", "METHOD_NOT_ALLOWED")
 		return
 	}
 
 	var req model.PayRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error(), "INVALID_REQUEST")
 		return
 	}
 
 	// Get password as []byte, use it, then zero it immediately
 	passwordBytes, err := config.GetSolanaPasswordBytes()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error(), "PASSWORD_REQUIRED")
 		return
 	}
 	defer clear(passwordBytes) // Always clear password from memory
 
 	payResp, err := solana.PaySOL(h.filePath, passwordBytes, req.ToAddress, req.Amount, h.cooldownMinutes)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusInternalServerError, err.Error(), "PAYMENT_FAILED")
 		return
 	}
 
@@ -211,7 +191,7 @@ func (h *SolanaHandler) PaySOL(w http.ResponseWriter, r *http.Request) {
 // @Router       /solana/transactions [get]
 func (h *SolanaHandler) TransactionHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed. Should be GET", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed: use GET", "METHOD_NOT_ALLOWED")
 		return
 	}
 
@@ -222,9 +202,7 @@ func (h *SolanaHandler) TransactionHistory(w http.ResponseWriter, r *http.Reques
 	if fromStr := r.URL.Query().Get("from"); fromStr != "" {
 		t, err := time.Parse(dateLayout, fromStr)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "invalid from date: use YYYY-MM-DD (e.g. 2006-01-02)"})
+			writeError(w, http.StatusBadRequest, "invalid from date: use YYYY-MM-DD (e.g. 2006-01-02)", "INVALID_DATE")
 			return
 		}
 		req.From = &t
@@ -232,9 +210,7 @@ func (h *SolanaHandler) TransactionHistory(w http.ResponseWriter, r *http.Reques
 	if toStr := r.URL.Query().Get("to"); toStr != "" {
 		t, err := time.Parse(dateLayout, toStr)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "invalid to date: use YYYY-MM-DD (e.g. 2006-01-02)"})
+			writeError(w, http.StatusBadRequest, "invalid to date: use YYYY-MM-DD (e.g. 2006-01-02)", "INVALID_DATE")
 			return
 		}
 		// End of day so filter is inclusive
@@ -268,21 +244,29 @@ func (h *SolanaHandler) TransactionHistory(w http.ResponseWriter, r *http.Reques
 
 	// Validate
 	if err := req.Validate(); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error(), "VALIDATION_FAILED")
 		return
 	}
 
 	logResp, err := solana.GetTransactions(h.filePath, &req)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeError(w, http.StatusInternalServerError, err.Error(), "TRANSACTIONS_FETCH_FAILED")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(logResp)
+}
+
+
+// writeError sends a consistent JSON error response.
+func writeError(w http.ResponseWriter, status int, errMsg string, code string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	resp := model.ErrorResponse{Error: errMsg}
+	if code != "" {
+		resp.Code = code
+	}
+	json.NewEncoder(w).Encode(resp)
 }

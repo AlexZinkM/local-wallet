@@ -37,14 +37,15 @@ internal/
 **PowerShell (Windows):**
 ```powershell
 $env:SOLANA_FILE_PATH="C:\path\to\wallet.cwt"
-$env:SOLANA_PASSWORD="your-password"
 go run cmd/app/main.go
 ```
 
 **Bash (Linux/macOS):**
 ```bash
-SOLANA_FILE_PATH=/path/to/wallet.cwt SOLANA_PASSWORD=your-password go run cmd/app/main.go
+SOLANA_FILE_PATH=/path/to/wallet.cwt go run cmd/app/main.go
 ```
+
+The app will prompt for the wallet password in the terminal at startup. It is stored securely in memory only (never in environment variables).
 
 **Swagger UI:** after starting the app, open **http://127.0.0.1:8080/swagger/index.html** for full request/response schemas and try-it-out.
 
@@ -52,11 +53,12 @@ SOLANA_FILE_PATH=/path/to/wallet.cwt SOLANA_PASSWORD=your-password go run cmd/ap
 
 | Variable               | Required | Description |
 |------------------------|----------|-------------|
-| `SOLANA_FILE_PATH`     | yes      | Absolute path to .cwt wallet file 
-| `SOLANA_PASSWORD`      | yes      | Password for encrypting/decrypting private key 
-| `PORT`                 | no       | Server port (default: `8080`) 
-| `SOLANA_RPC_URL`       | no       | Solana RPC URL (default: public mainnet) 
-| `PAY_COOLDOWN_MINUTES` | no       | Minutes between pay operations (default: `4`) 
+| `SOLANA_FILE_PATH`     | yes      | Absolute path to .cwt wallet file |
+| `PORT`                 | no       | Server port (default: `8080`) |
+| `SOLANA_RPC_URL`       | no       | Solana RPC URL (default: public mainnet) |
+| `PAY_COOLDOWN_MINUTES` | no       | Minutes between pay operations (default: `4`) |
+
+**Password:** Entered at runtime when the app starts (prompted in terminal, stored in memory only).
 
 ---
 
@@ -111,7 +113,7 @@ Import `github.com/AlexZinkM/local-wallet/solana` and call these functions. You 
 ## Security and precision
 
 - **Bind:** Desktop server listens on `127.0.0.1` only.
-- **Encryption:** AES-256-GCM for private key in .cwt; password from env or caller.
+- **Encryption:** AES-256-GCM for private key in .cwt; password prompted at startup (desktop app) or passed by caller (library).
 - **Units:** 1 SOL = 10^9 lamports, 1 USDC = 10^6 micro-USDC; no float in calculations.
 
 ### .cwt file

@@ -6,10 +6,11 @@ import (
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
+	"golang.org/x/term"
 )
 
 // Config contains all configuration parameters for the application.
-// Note: SolanaPassword is NOT stored here for security - use GetSolanaPasswordBytes() instead
+// Note: Password is prompted at runtime and stored in memory - use GetSolanaPasswordBytes()
 type Config struct {
 	Port           string `envconfig:"PORT" default:"8080"`
 	PayCooldown    int    `envconfig:"PAY_COOLDOWN_MINUTES" default:"4"`
@@ -58,15 +59,40 @@ func GetSolanaRPCURL() string {
 	return Get().SolanaRPCURL
 }
 
-// GetSolanaPasswordBytes returns password as []byte directly from environment variable.
-// Returns an error if SOLANA_PASSWORD is not set.
-// Note: os.Getenv() returns string which may be allocated in heap, but we minimize its lifetime
-// by immediately copying to []byte. The original string will be GC'd after this function returns.
-// Caller must zero the returned slice after use for security
-func GetSolanaPasswordBytes() ([]byte, error) {
-	envVal := os.Getenv("SOLANA_PASSWORD")
-	if envVal == "" {
-		return nil, errors.New("SOLANA_PASSWORD not set")
+var passwordBytes []byte
+
+// PromptForPassword prompts the user for the wallet password in the terminal.
+// The password is read without echoing (hidden input) and stored in memory.
+// Call this at startup before the server begins handling requests.
+func PromptForPassword() error {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return errors.New("stdin is not a terminal: run the app interactively to enter password")
 	}
-	return []byte(envVal), nil
+	fmt.Fprint(os.Stderr, "Enter wallet password: ")
+	defer fmt.Fprintln(os.Stderr)
+
+	raw, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return fmt.Errorf("failed to read password: %w", err)
+	}
+	if len(raw) == 0 {
+		return errors.New("password cannot be empty")
+	}
+
+	passwordBytes = make([]byte, len(raw))
+	copy(passwordBytes, raw)
+	clear(raw)
+	return nil
+}
+
+// GetSolanaPasswordBytes returns the password stored in memory (from PromptForPassword).
+// Returns an error if the password was not set.
+// Caller must zero the returned slice after use for security.
+func GetSolanaPasswordBytes() ([]byte, error) {
+	if len(passwordBytes) == 0 {
+		return nil, errors.New("password not set: call PromptForPassword at startup")
+	}
+	out := make([]byte, len(passwordBytes))
+	copy(out, passwordBytes)
+	return out, nil
 }

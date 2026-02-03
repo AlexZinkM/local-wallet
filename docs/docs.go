@@ -30,7 +30,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.SolanaBalanceResponse"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.SolanaBalanceResponse"
                         }
                     }
                 }
@@ -53,7 +53,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.GenerateResponse"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.GenerateResponse"
                         }
                     }
                 }
@@ -79,7 +79,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.PayRequest"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest"
                         }
                     }
                 ],
@@ -87,7 +87,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.PayResponse"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse"
                         }
                     }
                 }
@@ -113,7 +113,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.PayRequest"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest"
                         }
                     }
                 ],
@@ -121,7 +121,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.PayResponse"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse"
                         }
                     }
                 }
@@ -185,7 +185,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/cwt_internal_model.LogResponse"
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.LogResponse"
                         }
                     }
                 }
@@ -193,9 +193,12 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "cwt_internal_model.GenerateResponse": {
+        "github_com_AlexZinkM_local-wallet_internal_model.GenerateResponse": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
                 "message": {
                     "type": "string"
                 },
@@ -204,7 +207,7 @@ const docTemplate = `{
                 }
             }
         },
-        "cwt_internal_model.LogResponse": {
+        "github_com_AlexZinkM_local-wallet_internal_model.LogResponse": {
             "type": "object",
             "properties": {
                 "address": {
@@ -221,12 +224,12 @@ const docTemplate = `{
                 "transactions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/cwt_internal_model.Transaction"
+                        "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.Transaction"
                     }
                 }
             }
         },
-        "cwt_internal_model.PayRequest": {
+        "github_com_AlexZinkM_local-wallet_internal_model.PayRequest": {
             "type": "object",
             "required": [
                 "amount",
@@ -241,7 +244,7 @@ const docTemplate = `{
                 }
             }
         },
-        "cwt_internal_model.PayResponse": {
+        "github_com_AlexZinkM_local-wallet_internal_model.PayResponse": {
             "type": "object",
             "properties": {
                 "txId": {
@@ -249,7 +252,7 @@ const docTemplate = `{
                 }
             }
         },
-        "cwt_internal_model.SolanaBalanceResponse": {
+        "github_com_AlexZinkM_local-wallet_internal_model.SolanaBalanceResponse": {
             "type": "object",
             "properties": {
                 "address": {
@@ -269,7 +272,7 @@ const docTemplate = `{
                 }
             }
         },
-        "cwt_internal_model.Transaction": {
+        "github_com_AlexZinkM_local-wallet_internal_model.Transaction": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -302,11 +305,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "$ref": "#/definitions/cwt_internal_model.TransactionType"
+                    "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.TransactionType"
                 }
             }
         },
-        "cwt_internal_model.TransactionType": {
+        "github_com_AlexZinkM_local-wallet_internal_model.TransactionType": {
             "type": "string",
             "enum": [
                 "DEBIT",
