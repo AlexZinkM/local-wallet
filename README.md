@@ -53,12 +53,27 @@ The app will prompt for the wallet password in the terminal at startup. It is st
 
 | Variable               | Required | Description |
 |------------------------|----------|-------------|
-| `SOLANA_FILE_PATH`     | yes      | Absolute path to .cwt wallet file |
+| `SOLANA_FILE_PATH`     | yes      | Absolute path to the `.cwt` wallet file (the file where the generated private key is stored in encrypted form) |
 | `PORT`                 | no       | Server port (default: `8080`) |
 | `SOLANA_RPC_URL`       | no       | Solana RPC URL (default: public mainnet) |
 | `PAY_COOLDOWN_MINUTES` | no       | Minutes between pay operations (default: `4`) |
 
+#### `SOLANA_RPC_URL` details
+
+`SOLANA_RPC_URL` is the node endpoint the app uses to:
+
+
+Default public mainnet RPC can hit rate limits, so for frequent requests use a private RPC provider (for example, Helius), otherwise you may get HTTP `429`.
+
+**Where to get one (Helius for example):**
+1. Create an account at [helius.dev](https://www.helius.dev/).
+2. Create a Solana API key in the dashboard.
+3. Copy your HTTPS RPC URL (looks like `https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY`).
+4. Set it in your environment before starting the app.
+
+
 **Password:** Entered at runtime when the app starts (prompted in terminal, stored in memory only).
+This password is used to encrypt/decrypt your `.cwt` key file. You must remember it (or store it safely): without it, the wallet file cannot be read by the app.
 
 ---
 
@@ -73,6 +88,9 @@ Details, request bodies, query params, and response shapes are in **Swagger**. S
 | GET | `/solana/transactions` | Get transaction history (filters in Swagger) |
 | POST | `/solana/pay/usdc` | Send USDC |
 | POST | `/solana/pay/sol` | Send SOL |
+
+**USDC note:** You do not need to have SOL in your account to accept (receive) USDC.  
+But you do need SOL in your account to send USDC to other accounts, because Solana network fees are paid in SOL.
 
 ---
 
@@ -119,3 +137,4 @@ Import `github.com/AlexZinkM/local-wallet/solana` and call these functions. You 
 ### .cwt file
 
 Contains (among others): `network`, `address`, `QR` (base64), `salt`, `nonce`, `cipherText`. Salt and nonce are per-file random.
+`SOLANA_FILE_PATH` points to this file. During wallet generation, the app creates this `.cwt` file and writes your encrypted private key there.
