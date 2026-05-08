@@ -71,6 +71,7 @@ func EncryptWallet(filePath string, network, address, qrCode string, walletData 
 	if err != nil {
 		return fmt.Errorf("failed to derive key: %w", err)
 	}
+	defer clear(key) // wipe derived key from memory
 
 	// Create AES cipher
 	block, err := aes.NewCipher(key)

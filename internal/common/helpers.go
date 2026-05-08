@@ -87,15 +87,15 @@ func parseWithDecimals(s string, decimals int) (uint64, error) {
 	return strconv.ParseUint(combined, 10, 64)
 }
 
-// CompareUSDCAmounts compares two USDC decimal string amounts without float precision loss.
-// Returns: -1 if a < b, 0 if a == b, 1 if a > b, and error if parsing fails
-func CompareUSDCAmounts(a, b string) (int, error) {
-	aVal, err := parseWithDecimals(a, USDCDecimals)
+// CompareAmounts compares two decimal string amounts without float precision loss.
+// Returns: -1 if a < b, 0 if a == b, 1 if a > b, and error if parsing fails.
+func CompareAmounts(a, b string, decimals int) (int, error) {
+	aVal, err := parseWithDecimals(a, decimals)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse amount '%s': %w", a, err)
 	}
 
-	bVal, err := parseWithDecimals(b, USDCDecimals)
+	bVal, err := parseWithDecimals(b, decimals)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse amount '%s': %w", b, err)
 	}

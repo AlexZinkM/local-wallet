@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,15 +20,52 @@ import (
 
 const (
 	usdcMintAddressMainnet = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" // USDC mint address on Solana mainnet (does not work on devnet/testnet)
-	usdcDecimals           = 6                                              // USDC always has 6 decimals
+	maxSupportedTxVersion = uint64(0)                                          // current supported Solana tx version
 )
 
 // SolanaClient is a client for working with Solana RPC
 type SolanaClient struct {
 	rpcClient     *rpc.Client
-	rpcURL        string
 	mintPublicKey solana.PublicKey
 	ownerPubkey   solana.PublicKey // address passed to NewSolanaClient
+}
+
+// TxStatus represents on-chain transaction state.
+type TxStatus string
+
+const (
+	TxStatusPending TxStatus = "PENDING"
+	TxStatusSuccess TxStatus = "SUCCESS"
+	TxStatusFailed  TxStatus = "FAILED"
+)
+
+// TempororyTxSubmissionError means RPC timed out while transaction may still be submitted.
+type TempororyTxSubmissionError struct {
+	TxID string
+	Err  error
+}
+
+func (e *TempororyTxSubmissionError) Error() string {
+	return fmt.Sprintf("transaction submission status unknown for tx %s: %v. Check status with the same Idempotency-Key to check progress", e.TxID, e.Err)
+}
+
+func (e *TempororyTxSubmissionError) Unwrap() error {
+	return e.Err
+}
+
+// IsTempororyTxSubmissionError returns true when error means tx may have been submitted.
+func IsTempororyTxSubmissionError(err error) bool {
+	var tempororyErr *TempororyTxSubmissionError
+	return errors.As(err, &tempororyErr)
+}
+
+// ExtractTempororyTxID returns tx id from TempororyTxSubmissionError if present.
+func ExtractTempororyTxID(err error) string {
+	var tempororyErr *TempororyTxSubmissionError
+	if errors.As(err, &tempororyErr) {
+		return tempororyErr.TxID
+	}
+	return ""
 }
 
 // NewSolanaClient creates a new Solana client for the given address.
@@ -45,20 +83,19 @@ func NewSolanaClient(address string) (*SolanaClient, error) {
 
 	return &SolanaClient{
 		rpcClient:     rpc.New(rpcURL),
-		rpcURL:        rpcURL,
 		mintPublicKey: mintPubKey,
 		ownerPubkey:   ownerPubkey,
 	}, nil
 }
 
 // GetBalance gets USDC (micro units) and SOL (lamports) balance for the client's address
-func (c *SolanaClient) GetBalance() (usdcMicro uint64, solLamports uint64, err error) {
-	solLamports, err = c.getSOLBalanceLamports()
+func (c *SolanaClient) GetBalance(ctx context.Context) (usdcMicro uint64, solLamports uint64, err error) {
+	solLamports, err = c.getSOLBalanceLamports(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get SOL balance: %w", err)
 	}
 
-	usdcMicro, err = c.getUSDCBalanceMicro()
+	usdcMicro, err = c.getUSDCBalanceMicro(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get USDC balance: %w", err)
 	}
@@ -67,9 +104,9 @@ func (c *SolanaClient) GetBalance() (usdcMicro uint64, solLamports uint64, err e
 }
 
 // getSOLBalanceLamports gets SOL balance in lamports
-func (c *SolanaClient) getSOLBalanceLamports() (uint64, error) {
+func (c *SolanaClient) getSOLBalanceLamports(ctx context.Context) (uint64, error) {
 	balance, err := c.rpcClient.GetBalance(
-		context.Background(),
+		ctx,
 		c.ownerPubkey,
 		rpc.CommitmentConfirmed,
 	)
@@ -80,16 +117,16 @@ func (c *SolanaClient) getSOLBalanceLamports() (uint64, error) {
 }
 
 // getUSDCBalanceMicro gets USDC balance in micro units (10^-6 USDC)
-func (c *SolanaClient) getUSDCBalanceMicro() (uint64, error) {
+func (c *SolanaClient) getUSDCBalanceMicro(ctx context.Context) (uint64, error) {
 	ataAddress, _, err := solana.FindAssociatedTokenAddress(c.ownerPubkey, c.mintPublicKey)
 	if err != nil {
 		return 0, fmt.Errorf("failed to find associated token account address: %w", err)
 	}
 
-	balance, err := c.rpcClient.GetTokenAccountBalance(context.Background(), ataAddress, rpc.CommitmentConfirmed)
+	balance, err := c.rpcClient.GetTokenAccountBalance(ctx, ataAddress, rpc.CommitmentConfirmed)
 	if err != nil {
 		if isATANotFoundError(err) {
-			return 0, c.getATANotFoundError()
+			return 0, c.getATANotFoundError(ctx)
 		}
 		return 0, fmt.Errorf("failed to get token account balance: %w", err)
 	}
@@ -107,12 +144,12 @@ func (c *SolanaClient) getUSDCBalanceMicro() (uint64, error) {
 }
 
 // getTokenAccountRentExempt gets the minimum balance required for rent exemption of a token account
-func (c *SolanaClient) getTokenAccountRentExempt() (string, error) {
+func (c *SolanaClient) getTokenAccountRentExempt(ctx context.Context) (string, error) {
 	// Token account size is 165 bytes
 	const tokenAccountSize = 165
 
 	rentExempt, err := c.rpcClient.GetMinimumBalanceForRentExemption(
-		context.Background(),
+		ctx,
 		tokenAccountSize,
 		rpc.CommitmentFinalized,
 	)
@@ -146,7 +183,7 @@ type TokenAccountInfo struct {
 }
 
 // GetTransactions gets transactions for the client's address (USDC SPL token only)
-func (c *SolanaClient) GetTransactions() ([]SolanaTransaction, error) {
+func (c *SolanaClient) GetTransactions(ctx context.Context) ([]SolanaTransaction, error) {
 	// Get ATA address
 	ataAddress, _, err := solana.FindAssociatedTokenAddress(c.ownerPubkey, c.mintPublicKey)
 	if err != nil {
@@ -154,7 +191,7 @@ func (c *SolanaClient) GetTransactions() ([]SolanaTransaction, error) {
 	}
 
 	// Check if ATA exists by trying to get balance
-	_, err = c.rpcClient.GetTokenAccountBalance(context.Background(), ataAddress, rpc.CommitmentConfirmed)
+	_, err = c.rpcClient.GetTokenAccountBalance(ctx, ataAddress, rpc.CommitmentConfirmed)
 	if err != nil {
 		if isATANotFoundError(err) {
 			// If account doesn't exist, return empty list
@@ -165,11 +202,11 @@ func (c *SolanaClient) GetTransactions() ([]SolanaTransaction, error) {
 
 	// Collect all signatures from both main address and ATA
 	signatureSet := make(map[string]bool)
-	limit := 100
+	limit := 1000
 
 	// Get signatures for main address
 	sigs, err := c.rpcClient.GetSignaturesForAddressWithOpts(
-		context.Background(),
+		ctx,
 		c.ownerPubkey,
 		&rpc.GetSignaturesForAddressOpts{
 			Limit: &limit,
@@ -184,7 +221,7 @@ func (c *SolanaClient) GetTransactions() ([]SolanaTransaction, error) {
 
 	// Get signatures for ATA
 	tokenAccountSigs, err := c.rpcClient.GetSignaturesForAddressWithOpts(
-		context.Background(),
+		ctx,
 		ataAddress,
 		&rpc.GetSignaturesForAddressOpts{
 			Limit: &limit,
@@ -209,9 +246,9 @@ func (c *SolanaClient) GetTransactions() ([]SolanaTransaction, error) {
 		// Get transaction details (support versioned transactions)
 		// maxVersion is hardcoded - no point making it env var because
 		// new version support requires library update and rebuild anyway
-		maxVersion := uint64(0)
+		maxVersion := maxSupportedTxVersion
 		tx, err := c.rpcClient.GetTransaction(
-			context.Background(),
+			ctx,
 			sig,
 			&rpc.GetTransactionOpts{
 				Encoding:                       solana.EncodingBase64,
@@ -393,12 +430,12 @@ func (c *SolanaClient) parseTransaction(tx *rpc.GetTransactionResult, signature 
 		from = ownerPubkeyStr
 		// Find receiver
 		for i, key := range accountKeys {
-				pre := tx.Meta.PreBalances[i]
-				post := tx.Meta.PostBalances[i]
-				if post > pre && !key.Equals(c.ownerPubkey) {
-					to = key.String()
-					break
-				}
+			pre := tx.Meta.PreBalances[i]
+			post := tx.Meta.PostBalances[i]
+			if post > pre && !key.Equals(c.ownerPubkey) {
+				to = key.String()
+				break
+			}
 		}
 	}
 
@@ -424,7 +461,7 @@ func (c *SolanaClient) parseTransaction(tx *rpc.GetTransactionResult, signature 
 
 // CreateUSDCTransaction creates and signs a USDC transfer transaction
 // privateKeyBytes must be full 64-byte Solana private key (caller should zero it after use)
-func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes []byte, amount string) (string, error) {
+func (c *SolanaClient) CreateUSDCTransaction(ctx context.Context, toAddress string, privateKeyBytes []byte, amount string) (string, error) {
 
 	toPubkey, err := solana.PublicKeyFromBase58(toAddress)
 	if err != nil {
@@ -451,7 +488,7 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 	}
 
 	// Get latest blockhash (GetRecentBlockhash is deprecated, use GetLatestBlockhash)
-	recent, err := c.rpcClient.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+	recent, err := c.rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return "", fmt.Errorf("failed to get recent blockhash: %w", err)
 	}
@@ -463,10 +500,10 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 	}
 
 	// Check if source ATA exists by trying to get balance
-	_, err = c.rpcClient.GetTokenAccountBalance(context.Background(), sourceTokenAccount, rpc.CommitmentConfirmed)
+	_, err = c.rpcClient.GetTokenAccountBalance(ctx, sourceTokenAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		if isATANotFoundError(err) {
-			return "", c.getATANotFoundError()
+			return "", c.getATANotFoundError(ctx)
 		}
 		return "", fmt.Errorf("failed to check source token account: %w", err)
 	}
@@ -478,7 +515,7 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 	}
 
 	// Check if destination account exists, if not create it
-	destAccountInfo, err := c.rpcClient.GetAccountInfo(context.Background(), destTokenAccount)
+	destAccountInfo, err := c.rpcClient.GetAccountInfo(ctx, destTokenAccount)
 	if err != nil && !isATANotFoundError(err) {
 		return "", fmt.Errorf("failed to get destination account info: %w", err)
 	}
@@ -495,7 +532,7 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 		// Create transfer instruction
 		transferInstruction := token.NewTransferCheckedInstruction(
 			amountUint64,
-			usdcDecimals,
+			common.USDCDecimals,
 			sourceTokenAccount,
 			c.mintPublicKey,
 			destTokenAccount,
@@ -524,9 +561,11 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 			return "", fmt.Errorf("failed to sign transaction: %w", err)
 		}
 
+		txID := tx.Signatures[0].String()
+
 		// Send transaction
 		sig, err := c.rpcClient.SendTransactionWithOpts(
-			context.Background(),
+			ctx,
 			tx,
 			rpc.TransactionOpts{
 				SkipPreflight:       false, // Transaction validation befor node
@@ -534,7 +573,10 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 			},
 		)
 		if err != nil {
-			return "", fmt.Errorf("failed to send transaction: %w", err)
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return txID, &TempororyTxSubmissionError{TxID: txID, Err: err}
+			}
+			return "", fmt.Errorf("failed to send transaction: %w", normalizeSendTransactionError(err))
 		}
 
 		return sig.String(), nil
@@ -543,7 +585,7 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 	// Destination account exists, just transfer
 	transferInstruction := token.NewTransferCheckedInstruction(
 		amountUint64,
-		usdcDecimals,
+		common.USDCDecimals,
 		sourceTokenAccount,
 		c.mintPublicKey,
 		destTokenAccount,
@@ -572,9 +614,11 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 		return "", fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
+	txID := tx.Signatures[0].String()
+
 	// Send transaction
 	sig, err := c.rpcClient.SendTransactionWithOpts(
-		context.Background(),
+		ctx,
 		tx,
 		rpc.TransactionOpts{
 			SkipPreflight:       false,
@@ -582,7 +626,10 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 		},
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to send transaction: %w", err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return txID, &TempororyTxSubmissionError{TxID: txID, Err: err}
+		}
+		return "", fmt.Errorf("failed to send transaction: %w", normalizeSendTransactionError(err))
 	}
 
 	return sig.String(), nil
@@ -590,7 +637,7 @@ func (c *SolanaClient) CreateUSDCTransaction(toAddress string, privateKeyBytes [
 
 // CreateSOLTransaction creates and signs a SOL transfer transaction
 // privateKeyBytes must be full 64-byte Solana private key (caller should zero it after use)
-func (c *SolanaClient) CreateSOLTransaction(toAddress string, privateKeyBytes []byte, amount string) (string, error) {
+func (c *SolanaClient) CreateSOLTransaction(ctx context.Context, toAddress string, privateKeyBytes []byte, amount string) (string, error) {
 
 	toPubkey, err := solana.PublicKeyFromBase58(toAddress)
 	if err != nil {
@@ -617,7 +664,7 @@ func (c *SolanaClient) CreateSOLTransaction(toAddress string, privateKeyBytes []
 	}
 
 	// Get latest blockhash
-	recent, err := c.rpcClient.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+	recent, err := c.rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return "", fmt.Errorf("failed to get recent blockhash: %w", err)
 	}
@@ -650,9 +697,11 @@ func (c *SolanaClient) CreateSOLTransaction(toAddress string, privateKeyBytes []
 		return "", fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
+	txID := tx.Signatures[0].String()
+
 	// Send transaction
 	sig, err := c.rpcClient.SendTransactionWithOpts(
-		context.Background(),
+		ctx,
 		tx,
 		rpc.TransactionOpts{
 			SkipPreflight:       false,
@@ -660,7 +709,10 @@ func (c *SolanaClient) CreateSOLTransaction(toAddress string, privateKeyBytes []
 		},
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to send transaction: %w", err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return txID, &TempororyTxSubmissionError{TxID: txID, Err: err}
+		}
+		return "", fmt.Errorf("failed to send transaction: %w", normalizeSendTransactionError(err))
 	}
 
 	return sig.String(), nil
@@ -691,10 +743,57 @@ func isATANotFoundError(err error) bool {
 }
 
 // getATANotFoundError returns formatted error for missing USDC account
-func (c *SolanaClient) getATANotFoundError() error {
-	rentExempt, err := c.getTokenAccountRentExempt()
+func (c *SolanaClient) getATANotFoundError(ctx context.Context) error {
+	rentExempt, err := c.getTokenAccountRentExempt(ctx)
 	if err != nil {
 		return err
 	}
 	return fmt.Errorf("USDC token account not found for address %s. Please deposit any amount of USDC to this Solana address to create the account (requires rent exempt: %s SOL from the sender)", c.ownerPubkey.String(), rentExempt)
+}
+
+// GetTransactionStatus returns status for tx id from chain data.
+func (c *SolanaClient) GetTransactionStatus(ctx context.Context, txID string) (TxStatus, error) {
+	sig, err := solana.SignatureFromBase58(txID)
+	if err != nil {
+		return "", fmt.Errorf("invalid tx id: %w", err)
+	}
+
+	maxVersion := maxSupportedTxVersion
+	tx, err := c.rpcClient.GetTransaction(
+		ctx,
+		sig,
+		&rpc.GetTransactionOpts{
+			Encoding:                       solana.EncodingBase64,
+			MaxSupportedTransactionVersion: &maxVersion,
+		},
+	)
+	if err != nil {
+		if isTxNotFoundError(err) {
+			return TxStatusPending, nil
+		}
+		return "", fmt.Errorf("failed to fetch tx status: %w", err)
+	}
+
+	if tx.Meta != nil && tx.Meta.Err != nil {
+		return TxStatusFailed, nil
+	}
+	return TxStatusSuccess, nil
+}
+
+func isTxNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "not found") || strings.Contains(msg, "could not find")
+}
+
+func normalizeSendTransactionError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "InsufficientFundsForRent") {
+		return errors.New("amount is too small, network rejected transaction (InsufficientFundsForRent)")
+	}
+	return err
 }

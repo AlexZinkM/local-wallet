@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -15,31 +16,148 @@ import (
 
 const (
 	solFeeLamports = 5000 // Fee in lamports (0.000005 SOL)
+	statusPendingSubmissionUnknown = "PENDING_SUBMISSION_UNKNOWN"
+	statusSuccess                  = "SUCCESS"
+	statusFailedOnChain            = "FAILED_ON_CHAIN"
 )
 
 var (
-	lastPayTime time.Time
-	payMutex    sync.Mutex
+	payMutex        sync.Mutex
+	idempotencyData = map[string]paymentAttempt{}
 )
+
+type paymentAttempt struct {
+	Currency  string
+	ToAddress string
+	Amount    string
+	TxID      string
+	Status    string
+	Message   string
+	UpdatedAt time.Time
+}
+
+func attemptResponse(attempt paymentAttempt) *model.PayResponse {
+	return &model.PayResponse{
+		TxID:    attempt.TxID,
+		Status:  attempt.Status,
+		Message: attempt.Message,
+	}
+}
+
+func resolveAttemptStatus(ctx context.Context, filePath string, attempt paymentAttempt) (paymentAttempt, error) {
+	if attempt.TxID == "" || attempt.Status != statusPendingSubmissionUnknown {
+		return attempt, nil
+	}
+
+	address, err := crypto.ReadWalletAddress(filePath)
+	if err != nil {
+		return attempt, fmt.Errorf("failed to read wallet address: %w", err)
+	}
+
+	solanaClient, err := client.NewSolanaClient(address)
+	if err != nil {
+		return attempt, fmt.Errorf("failed to create Solana client: %w", err)
+	}
+
+	status, err := solanaClient.GetTransactionStatus(ctx, attempt.TxID)
+	if err != nil {
+		return attempt, err
+	}
+
+	if status == client.TxStatusSuccess {
+		attempt.Status = statusSuccess
+		attempt.Message = "transaction confirmed"
+		attempt.UpdatedAt = time.Now()
+		return attempt, nil
+	}
+	if status == client.TxStatusFailed {
+		attempt.Status = statusFailedOnChain
+		attempt.Message = "transaction failed on chain"
+		attempt.UpdatedAt = time.Now()
+		return attempt, nil
+	}
+
+	return attempt, nil
+}
+
+func precheckIdempotency(ctx context.Context, filePath string, idempotencyKey, currency, toAddress, amount string) (*model.PayResponse, error) {
+	payMutex.Lock()
+
+	if idempotencyKey != "" {
+		if attempt, ok := idempotencyData[idempotencyKey]; ok {
+			if attempt.Currency != currency || attempt.ToAddress != toAddress || attempt.Amount != amount {
+				payMutex.Unlock()
+				return nil, fmt.Errorf("idempotency key already used with different payment payload")
+			}
+			payMutex.Unlock()
+			updatedAttempt, err := resolveAttemptStatus(ctx, filePath, attempt)
+			if err == nil && updatedAttempt != attempt {
+				payMutex.Lock()
+				idempotencyData[idempotencyKey] = updatedAttempt
+				payMutex.Unlock()
+				attempt = updatedAttempt
+			}
+			return attemptResponse(attempt), nil
+		}
+	}
+	payMutex.Unlock()
+
+	return nil, nil
+}
+
+func storeAttempt(idempotencyKey, currency, toAddress, amount string, resp *model.PayResponse) {
+	if idempotencyKey == "" || resp == nil {
+		return
+	}
+	idempotencyData[idempotencyKey] = paymentAttempt{
+		Currency:  currency,
+		ToAddress: toAddress,
+		Amount:    amount,
+		TxID:      resp.TxID,
+		Status:    resp.Status,
+		Message:   resp.Message,
+		UpdatedAt: time.Now(),
+	}
+}
+
+func storePendingAttempt(idempotencyKey, currency, toAddress, amount, txID string) *model.PayResponse {
+	resp := &model.PayResponse{
+		TxID:    txID,
+		Status:  statusPendingSubmissionUnknown,
+		Message: "transaction submission timed out; status is unknown, retry with the same Idempotency-Key to check progress",
+	}
+	payMutex.Lock()
+	storeAttempt(idempotencyKey, currency, toAddress, amount, resp)
+	payMutex.Unlock()
+	return resp
+}
+
+func storeSuccessAttempt(idempotencyKey, currency, toAddress, amount, txID string) *model.PayResponse {
+	resp := &model.PayResponse{
+		TxID:    txID,
+		Status:  statusSuccess,
+		Message: "transaction submitted",
+	}
+	payMutex.Lock()
+	storeAttempt(idempotencyKey, currency, toAddress, amount, resp)
+	payMutex.Unlock()
+	return resp
+}
 
 // PayUSDC sends a USDC transaction
 // password must be []byte for security (caller should zero it after use)
-func PayUSDC(filePath string, password []byte, toAddress, amount string, cooldownMinutes int) (*model.PayResponse, error) {
+func PayUSDC(ctx context.Context, filePath string, password []byte, toAddress, amount string, idempotencyKey string) (*model.PayResponse, error) {
 	// Validate recipient address
 	if !isValidSolanaAddress(toAddress) {
 		return nil, fmt.Errorf("invalid Solana address")
 	}
 
-	// Check cooldown
-	payMutex.Lock()
-	defer payMutex.Unlock()
-
-	if !lastPayTime.IsZero() {
-		cooldownDuration := time.Duration(cooldownMinutes) * time.Minute
-		if time.Since(lastPayTime) < cooldownDuration {
-			remaining := cooldownDuration - time.Since(lastPayTime)
-			return nil, fmt.Errorf("cooldown active, please wait %v", remaining.Round(time.Second))
-		}
+	existingResp, err := precheckIdempotency(ctx, filePath, idempotencyKey, "USDC", toAddress, amount)
+	if err != nil {
+		return nil, err
+	}
+	if existingResp != nil {
+		return existingResp, nil
 	}
 
 	// Read address from file
@@ -82,7 +200,7 @@ func PayUSDC(filePath string, password []byte, toAddress, amount string, cooldow
 	}
 
 	// Check balance (raw units: USDC micro, SOL lamports)
-	usdcBalMicro, solBalLamports, err := solanaClient.GetBalance()
+	usdcBalMicro, solBalLamports, err := solanaClient.GetBalance(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check balance: %w", err)
 	}
@@ -91,6 +209,9 @@ func PayUSDC(filePath string, password []byte, toAddress, amount string, cooldow
 	usdcAmountMicro, err := common.USDCToMicro(amount)
 	if err != nil {
 		return nil, fmt.Errorf("invalid amount: %w", err)
+	}
+	if usdcAmountMicro == 0 {
+		return nil, fmt.Errorf("amount is too small: minimum is 0.000001 USDC")
 	}
 
 	// Check USDC sufficiency
@@ -105,37 +226,32 @@ func PayUSDC(filePath string, password []byte, toAddress, amount string, cooldow
 	}
 
 	// Create and send transaction
-	txID, err := solanaClient.CreateUSDCTransaction(toAddress, walletData.PrivateKey, amount)
+	txID, err := solanaClient.CreateUSDCTransaction(ctx, toAddress, walletData.PrivateKey, amount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send transaction: %w", err)
+		if client.IsTempororyTxSubmissionError(err) {
+			txID = client.ExtractTempororyTxID(err)
+			return storePendingAttempt(idempotencyKey, "USDC", toAddress, amount, txID), nil
+		}
+		return nil, err
 	}
 
-	// Save transaction time
-	lastPayTime = time.Now()
-
-	return &model.PayResponse{
-		TxID: txID,
-	}, nil
+	return storeSuccessAttempt(idempotencyKey, "USDC", toAddress, amount, txID), nil
 }
 
 // PaySOL sends a SOL transaction
 // password must be []byte for security (caller should zero it after use)
-func PaySOL(filePath string, password []byte, toAddress, amount string, cooldownMinutes int) (*model.PayResponse, error) {
+func PaySOL(ctx context.Context, filePath string, password []byte, toAddress, amount string, idempotencyKey string) (*model.PayResponse, error) {
 	// Validate recipient address
 	if !isValidSolanaAddress(toAddress) {
 		return nil, fmt.Errorf("invalid Solana address")
 	}
 
-	// Check cooldown
-	payMutex.Lock()
-	defer payMutex.Unlock()
-
-	if !lastPayTime.IsZero() {
-		cooldownDuration := time.Duration(cooldownMinutes) * time.Minute
-		if time.Since(lastPayTime) < cooldownDuration {
-			remaining := cooldownDuration - time.Since(lastPayTime)
-			return nil, fmt.Errorf("cooldown active, please wait %v", remaining.Round(time.Second))
-		}
+	existingResp, err := precheckIdempotency(ctx, filePath, idempotencyKey, "SOL", toAddress, amount)
+	if err != nil {
+		return nil, err
+	}
+	if existingResp != nil {
+		return existingResp, nil
 	}
 
 	// Read address from file
@@ -179,7 +295,7 @@ func PaySOL(filePath string, password []byte, toAddress, amount string, cooldown
 	}
 
 	// Check balance (lamports)
-	_, solBalLamports, err := solanaClient.GetBalance()
+	_, solBalLamports, err := solanaClient.GetBalance(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check balance: %w", err)
 	}
@@ -188,6 +304,9 @@ func PaySOL(filePath string, password []byte, toAddress, amount string, cooldown
 	solAmountLamports, err := common.SOLToLamports(amount)
 	if err != nil {
 		return nil, fmt.Errorf("invalid amount: %w", err)
+	}
+	if solAmountLamports == 0 {
+		return nil, fmt.Errorf("amount is too small: minimum is 0.000000001 SOL")
 	}
 
 	// Check SOL sufficiency (amount + fee)
@@ -203,17 +322,16 @@ func PaySOL(filePath string, password []byte, toAddress, amount string, cooldown
 	}
 
 	// Create and send transaction
-	txID, err := solanaClient.CreateSOLTransaction(toAddress, walletData.PrivateKey, amount)
+	txID, err := solanaClient.CreateSOLTransaction(ctx, toAddress, walletData.PrivateKey, amount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send transaction: %w", err)
+		if client.IsTempororyTxSubmissionError(err) {
+			txID = client.ExtractTempororyTxID(err)
+			return storePendingAttempt(idempotencyKey, "SOL", toAddress, amount, txID), nil
+		}
+		return nil, err
 	}
 
-	// Save transaction time
-	lastPayTime = time.Now()
-
-	return &model.PayResponse{
-		TxID: txID,
-	}, nil
+	return storeSuccessAttempt(idempotencyKey, "SOL", toAddress, amount, txID), nil
 }
 
 // isValidSolanaAddress validates a Solana address

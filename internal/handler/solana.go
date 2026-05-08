@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,9 +14,10 @@ import (
 
 // SolanaHandler holds configuration for Solana operations
 type SolanaHandler struct {
-	filePath        string
-	cooldownMinutes int
+	filePath string
 }
+
+const rpcRequestTimeout = 30 * time.Second
 
 // NewSolanaHandler creates a new SolanaHandler with config values
 func NewSolanaHandler() (*SolanaHandler, error) {
@@ -25,8 +27,7 @@ func NewSolanaHandler() (*SolanaHandler, error) {
 	}
 
 	return &SolanaHandler{
-		filePath:        filePath,
-		cooldownMinutes: config.GetPayCooldown(),
+		filePath: filePath,
 	}, nil
 }
 
@@ -84,7 +85,10 @@ func (h *SolanaHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := solana.GetBalance(h.filePath)
+	ctx, cancel := context.WithTimeout(r.Context(), rpcRequestTimeout)
+	defer cancel()
+
+	balance, err := solana.GetBalance(ctx, h.filePath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error(), "BALANCE_FETCH_FAILED")
 		return
@@ -102,7 +106,9 @@ func (h *SolanaHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        request  body      model.PayRequest  true  "Payment data"
+// @Param        Idempotency-Key  header    string  true  "Unique key for idempotent payment retries"
 // @Success      200      {object}  model.PayResponse
+// @Success      202      {object}  model.PayResponse
 // @Router       /solana/pay/usdc [post]
 func (h *SolanaHandler) PayUSDC(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -116,6 +122,12 @@ func (h *SolanaHandler) PayUSDC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	idempotencyKey := r.Header.Get("Idempotency-Key")
+	if idempotencyKey == "" {
+		writeError(w, http.StatusBadRequest, "missing Idempotency-Key header", "IDEMPOTENCY_KEY_REQUIRED")
+		return
+	}
+
 	// Get password as []byte, use it, then zero it immediately
 	passwordBytes, err := config.GetSolanaPasswordBytes()
 	if err != nil {
@@ -124,14 +136,21 @@ func (h *SolanaHandler) PayUSDC(w http.ResponseWriter, r *http.Request) {
 	}
 	defer clear(passwordBytes) // Always clear password from memory
 
-	payResp, err := solana.PayUSDC(h.filePath, passwordBytes, req.ToAddress, req.Amount, h.cooldownMinutes)
+	ctx, cancel := context.WithTimeout(r.Context(), rpcRequestTimeout)
+	defer cancel()
+
+	payResp, err := solana.PayUSDC(ctx, h.filePath, passwordBytes, req.ToAddress, req.Amount, idempotencyKey)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error(), "PAYMENT_FAILED")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	if payResp.Status == "PENDING_SUBMISSION_UNKNOWN" {
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 	json.NewEncoder(w).Encode(payResp)
 }
 
@@ -142,7 +161,9 @@ func (h *SolanaHandler) PayUSDC(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        request  body      model.PayRequest  true  "Payment data"
+// @Param        Idempotency-Key  header    string  true  "Unique key for idempotent payment retries"
 // @Success      200      {object}  model.PayResponse
+// @Success      202      {object}  model.PayResponse
 // @Router       /solana/pay/sol [post]
 func (h *SolanaHandler) PaySOL(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -156,6 +177,12 @@ func (h *SolanaHandler) PaySOL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	idempotencyKey := r.Header.Get("Idempotency-Key")
+	if idempotencyKey == "" {
+		writeError(w, http.StatusBadRequest, "missing Idempotency-Key header", "IDEMPOTENCY_KEY_REQUIRED")
+		return
+	}
+
 	// Get password as []byte, use it, then zero it immediately
 	passwordBytes, err := config.GetSolanaPasswordBytes()
 	if err != nil {
@@ -164,14 +191,21 @@ func (h *SolanaHandler) PaySOL(w http.ResponseWriter, r *http.Request) {
 	}
 	defer clear(passwordBytes) // Always clear password from memory
 
-	payResp, err := solana.PaySOL(h.filePath, passwordBytes, req.ToAddress, req.Amount, h.cooldownMinutes)
+	ctx, cancel := context.WithTimeout(r.Context(), rpcRequestTimeout)
+	defer cancel()
+
+	payResp, err := solana.PaySOL(ctx, h.filePath, passwordBytes, req.ToAddress, req.Amount, idempotencyKey)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error(), "PAYMENT_FAILED")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	if payResp.Status == "PENDING_SUBMISSION_UNKNOWN" {
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 	json.NewEncoder(w).Encode(payResp)
 }
 
@@ -248,7 +282,10 @@ func (h *SolanaHandler) TransactionHistory(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	logResp, err := solana.GetTransactions(h.filePath, &req)
+	ctx, cancel := context.WithTimeout(r.Context(), rpcRequestTimeout)
+	defer cancel()
+
+	logResp, err := solana.GetTransactions(ctx, h.filePath, &req)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error(), "TRANSACTIONS_FETCH_FAILED")
 		return
@@ -258,7 +295,6 @@ func (h *SolanaHandler) TransactionHistory(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(logResp)
 }
-
 
 // writeError sends a consistent JSON error response.
 func writeError(w http.ResponseWriter, status int, errMsg string, code string) {

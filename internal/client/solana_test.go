@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestGetBalance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
-	usdc, sol, err := client.GetBalance()
+	usdc, sol, err := client.GetBalance(context.Background())
 	if err != nil {
 		t.Fatalf("GetBalance: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestGetTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
-	txs, err := client.GetTransactions()
+	txs, err := client.GetTransactions(context.Background())
 	if err != nil {
 		t.Fatalf("GetTransactions: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestCreateUSDCTransaction_InvalidToAddress(t *testing.T) {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
 	key := make([]byte, 64)
-	_, err = client.CreateUSDCTransaction("invalid", key, "1.0")
+	_, err = client.CreateUSDCTransaction(context.Background(), "invalid", key, "1.0")
 	if err == nil {
 		t.Fatal("expected error for invalid to address")
 	}
@@ -82,7 +83,7 @@ func TestCreateUSDCTransaction_InvalidKeyLength(t *testing.T) {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
 	key := make([]byte, 32)
-	_, err = client.CreateUSDCTransaction("11111111111111111111111111111111", key, "1.0")
+	_, err = client.CreateUSDCTransaction(context.Background(), "11111111111111111111111111111111", key, "1.0")
 	if err == nil {
 		t.Fatal("expected error for invalid key length")
 	}
@@ -95,7 +96,7 @@ func TestCreateUSDCTransaction_KeyMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
-	_, err = client.CreateUSDCTransaction(walletA.PublicKey().String(), walletA.PrivateKey, "0.001")
+	_, err = client.CreateUSDCTransaction(context.Background(), walletA.PublicKey().String(), walletA.PrivateKey, "0.001")
 	if err == nil {
 		t.Fatal("expected error for key/address mismatch")
 	}
@@ -107,7 +108,7 @@ func TestCreateSOLTransaction_InvalidToAddress(t *testing.T) {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
 	key := make([]byte, 64)
-	_, err = client.CreateSOLTransaction("invalid", key, "0.001")
+	_, err = client.CreateSOLTransaction(context.Background(), "invalid", key, "0.001")
 	if err == nil {
 		t.Fatal("expected error for invalid to address")
 	}
@@ -119,7 +120,7 @@ func TestCreateSOLTransaction_InvalidKeyLength(t *testing.T) {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
 	key := make([]byte, 32)
-	_, err = client.CreateSOLTransaction("11111111111111111111111111111111", key, "0.001")
+	_, err = client.CreateSOLTransaction(context.Background(), "11111111111111111111111111111111", key, "0.001")
 	if err == nil {
 		t.Fatal("expected error for invalid key length")
 	}
@@ -132,7 +133,7 @@ func TestCreateSOLTransaction_KeyMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
-	_, err = client.CreateSOLTransaction(walletA.PublicKey().String(), walletA.PrivateKey, "0.001")
+	_, err = client.CreateSOLTransaction(context.Background(), walletA.PublicKey().String(), walletA.PrivateKey, "0.001")
 	if err == nil {
 		t.Fatal("expected error for key/address mismatch")
 	}
@@ -143,7 +144,7 @@ func TestGetATANotFoundError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSolanaClient: %v", err)
 	}
-	err = client.getATANotFoundError()
+	err = client.getATANotFoundError(context.Background())
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}

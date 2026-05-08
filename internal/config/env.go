@@ -13,7 +13,6 @@ import (
 // Note: Password is prompted at runtime and stored in memory - use GetSolanaPasswordBytes()
 type Config struct {
 	Port           string `envconfig:"PORT" default:"8080"`
-	PayCooldown    int    `envconfig:"PAY_COOLDOWN_MINUTES" default:"4"`
 	SolanaFilePath string `envconfig:"SOLANA_FILE_PATH" required:"true"`
 	SolanaRPCURL   string `envconfig:"SOLANA_RPC_URL" default:"https://api.mainnet-beta.solana.com"`
 }
@@ -42,11 +41,6 @@ func Get() *Config {
 // GetPort returns port from configuration
 func GetPort() string {
 	return Get().Port
-}
-
-// GetPayCooldown returns cooldown in minutes from configuration
-func GetPayCooldown() int {
-	return Get().PayCooldown
 }
 
 // GetSolanaFilePath returns path to .cwt file from configuration

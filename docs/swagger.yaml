@@ -13,11 +13,11 @@ definitions:
     properties:
       address:
         type: string
-      total_income_USDC:
-        description: USDC only
+      filtered_total_income_USDC:
+        description: USDC only; calculated on filtered transactions
         type: string
-      total_spent_USDC:
-        description: USDC only
+      filtered_total_spent_USDC:
+        description: USDC only; calculated on filtered transactions
         type: string
       transactions:
         items:
@@ -36,6 +36,10 @@ definitions:
     type: object
   github_com_AlexZinkM_local-wallet_internal_model.PayResponse:
     properties:
+      message:
+        type: string
+      status:
+        type: string
       txId:
         type: string
     type: object
@@ -134,11 +138,20 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest'
+      - description: Unique key for idempotent payment retries
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse'
+        "202":
+          description: Accepted
           schema:
             $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse'
       summary: Send SOL
@@ -156,11 +169,20 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest'
+      - description: Unique key for idempotent payment retries
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse'
+        "202":
+          description: Accepted
           schema:
             $ref: '#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse'
       summary: Send USDC

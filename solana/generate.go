@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"errors"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -29,8 +30,8 @@ func (e *FileExistsError) Error() string {
 
 // IsFileExistsError checks if error is FileExistsError
 func IsFileExistsError(err error) bool {
-	_, ok := err.(*FileExistsError)
-	return ok
+	var target *FileExistsError
+	return errors.As(err, &target)
 }
 
 // GenerateWallet generates a new Solana wallet and saves it to .cwt file.

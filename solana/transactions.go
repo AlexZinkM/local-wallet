@@ -1,9 +1,10 @@
 package solana
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"sort"
-	"strconv"
 
 	"github.com/AlexZinkM/local-wallet/internal/client"
 	"github.com/AlexZinkM/local-wallet/internal/common"
@@ -12,7 +13,7 @@ import (
 )
 
 // GetTransactions gets wallet transactions with filtering
-func GetTransactions(filePath string, req *model.LogRequest) (*model.LogResponse, error) {
+func GetTransactions(ctx context.Context, filePath string, req *model.LogRequest) (*model.LogResponse, error) {
 	// Read address from file
 	address, err := crypto.ReadWalletAddress(filePath)
 	if err != nil {
@@ -26,7 +27,7 @@ func GetTransactions(filePath string, req *model.LogRequest) (*model.LogResponse
 	}
 
 	// Get all transactions
-	solanaTxs, err := solanaClient.GetTransactions()
+	solanaTxs, err := solanaClient.GetTransactions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,11 @@ func GetTransactions(filePath string, req *model.LogRequest) (*model.LogResponse
 
 		// Filter by amount (using integer comparison to avoid float precision issues)
 		if req.MinAmount != nil {
-			cmp, err := common.CompareUSDCAmounts(tx.Amount, *req.MinAmount)
+			decimals := common.USDCDecimals
+			if tx.Currency == "SOL" {
+				decimals = common.SOLDecimals
+			}
+			cmp, err := common.CompareAmounts(tx.Amount, *req.MinAmount, decimals)
 			if err != nil {
 				return nil, fmt.Errorf("failed to compare min amount: %w", err)
 			}
@@ -70,7 +75,11 @@ func GetTransactions(filePath string, req *model.LogRequest) (*model.LogResponse
 			}
 		}
 		if req.MaxAmount != nil {
-			cmp, err := common.CompareUSDCAmounts(tx.Amount, *req.MaxAmount)
+			decimals := common.USDCDecimals
+			if tx.Currency == "SOL" {
+				decimals = common.SOLDecimals
+			}
+			cmp, err := common.CompareAmounts(tx.Amount, *req.MaxAmount, decimals)
 			if err != nil {
 				return nil, fmt.Errorf("failed to compare max amount: %w", err)
 			}
@@ -98,28 +107,29 @@ func GetTransactions(filePath string, req *model.LogRequest) (*model.LogResponse
 		return resultTransactions[i].Timestamp.After(resultTransactions[j].Timestamp)
 	})
 
-	// Calculate total_income_USDC and total_spent_USDC (USDC transactions only)
-	var totalIncomeUSDC, totalSpentUSDC float64
+	// Calculate filtered_total_*_USDC using exact integer arithmetic (micro USDC units).
+	var totalIncomeMicro, totalSpentMicro uint64
 	for _, tx := range resultTransactions {
-		if tx.Currency != "USDC" {
+		if tx.Currency != "USDC" || tx.Status != "success" {
 			continue
 		}
-		amount, err := strconv.ParseFloat(tx.Amount, 64)
+		micro, err := common.USDCToMicro(tx.Amount)
 		if err != nil {
+			log.Printf("failed to parse USDC amount for tx %s: %v", tx.TxID, err)
 			continue
 		}
 		switch tx.Type {
 		case model.TransactionTypeDebit:
-			totalIncomeUSDC += amount
+			totalIncomeMicro += micro
 		case model.TransactionTypeCredit:
-			totalSpentUSDC += amount
+			totalSpentMicro += micro
 		}
 	}
 
 	return &model.LogResponse{
-		Address:         address,
-		TotalIncomeUSDC: fmt.Sprintf("%.6f", totalIncomeUSDC),
-		TotalSpentUSDC:  fmt.Sprintf("%.6f", totalSpentUSDC),
-		Transactions:    resultTransactions,
+		Address:                 address,
+		FilteredTotalIncomeUSDC: common.MicroToUSDC(totalIncomeMicro),
+		FilteredTotalSpentUSDC:  common.MicroToUSDC(totalSpentMicro),
+		Transactions:            resultTransactions,
 	}, nil
 }

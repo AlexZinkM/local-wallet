@@ -81,11 +81,24 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Unique key for idempotent payment retries",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse"
                         }
@@ -115,11 +128,24 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Unique key for idempotent payment retries",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "$ref": "#/definitions/github_com_AlexZinkM_local-wallet_internal_model.PayResponse"
                         }
@@ -213,12 +239,12 @@ const docTemplate = `{
                 "address": {
                     "type": "string"
                 },
-                "total_income_USDC": {
-                    "description": "USDC only",
+                "filtered_total_income_USDC": {
+                    "description": "USDC only; calculated on filtered transactions",
                     "type": "string"
                 },
-                "total_spent_USDC": {
-                    "description": "USDC only",
+                "filtered_total_spent_USDC": {
+                    "description": "USDC only; calculated on filtered transactions",
                     "type": "string"
                 },
                 "transactions": {
@@ -247,6 +273,12 @@ const docTemplate = `{
         "github_com_AlexZinkM_local-wallet_internal_model.PayResponse": {
             "type": "object",
             "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
                 "txId": {
                     "type": "string"
                 }

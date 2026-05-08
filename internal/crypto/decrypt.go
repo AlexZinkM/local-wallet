@@ -69,6 +69,7 @@ func DecryptWallet(filePath string, password []byte) (*model.CWTFile, *model.Wal
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to derive key: %w", err)
 	}
+	defer clear(key) // wipe derived key from memory
 
 	// Create AES cipher
 	block, err := aes.NewCipher(key)

@@ -8,5 +8,7 @@ type PayRequest struct {
 
 // PayResponse represents response for POST pay/...
 type PayResponse struct {
-	TxID string `json:"txId"`
+	TxID    string `json:"txId"`
+	Status  string `json:"status,omitempty"`
+	Message string `json:"message,omitempty"`
 }

@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -16,7 +17,7 @@ func init() {
 }
 
 func TestGetTransactions_FileNotFound(t *testing.T) {
-	_, err := GetTransactions("/nonexistent/path/wallet.cwt", &model.LogRequest{})
+	_, err := GetTransactions(context.Background(), "/nonexistent/path/wallet.cwt", &model.LogRequest{})
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}

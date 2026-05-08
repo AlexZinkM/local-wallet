@@ -2,3 +2,4 @@ Makefile
 *.exe
 .env
 *.cwt
+*.cursorignore

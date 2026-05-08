@@ -31,10 +31,10 @@ type Transaction struct {
 
 // LogResponse represents response for GET log/...
 type LogResponse struct {
-	Address         string        `json:"address"`
-	TotalIncomeUSDC string        `json:"total_income_USDC"` // USDC only
-	TotalSpentUSDC  string        `json:"total_spent_USDC"`  // USDC only
-	Transactions    []Transaction `json:"transactions"`
+	Address                 string        `json:"address"`
+	FilteredTotalIncomeUSDC string        `json:"filtered_total_income_USDC"` // USDC only; calculated on filtered transactions
+	FilteredTotalSpentUSDC  string        `json:"filtered_total_spent_USDC"`  // USDC only; calculated on filtered transactions
+	Transactions            []Transaction `json:"transactions"`
 }
 
 // LogRequest represents request parameters for GET log/...
@@ -60,7 +60,11 @@ func (r *LogRequest) Validate() error {
 		return fmt.Errorf("to date must be after or equal to from date")
 	}
 	if r.MinAmount != nil && r.MaxAmount != nil {
-		cmp, err := common.CompareUSDCAmounts(*r.MinAmount, *r.MaxAmount)
+		decimals := common.USDCDecimals
+		if r.Currency != nil && *r.Currency == "SOL" {
+			decimals = common.SOLDecimals
+		}
+		cmp, err := common.CompareAmounts(*r.MinAmount, *r.MaxAmount, decimals)
 		if err != nil {
 			return fmt.Errorf("invalid amount: %w", err)
 		}
